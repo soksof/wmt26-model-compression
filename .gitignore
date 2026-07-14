@@ -1,27 +1,13 @@
-workdir
-tmp/
-wmt25.jsonl
-*.bak
-.vscode/
-
-.history
-*~
-*.egg-info/
-*.egg
-*.whl
-*.tar.gz
-
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Distribution / packaging
-.Python
-build/
-dist/
-downloads/
-eggs/
-.eggs/
-.pytest_cache
-*.bak
+# working / derived / weights - never in the submission codebase (code-only)
+workdir/
+runs/
+.venv/
+models/
+submissions/*/workdir/
+submissions/*/.venv/
+**/__pycache__/
+*.pyc
+*.safetensors
+*.bin
+*.pt
+*.gguf

@@ -1,0 +1,20 @@
+# vLLM inference stack — pinned to the validated `eval` env (its vLLM smokes loaded our
+# INT4-W4A16 / FP8 / depth checkpoints). Only the three load-bearing packages are hard-pinned;
+# their transitive deps resolve automatically:
+#   - torch comes from vllm==0.23.0 (-> torch 2.11.0)
+#   - tokenizers + huggingface-hub come from transformers==5.12.1 (needs hf-hub>=1.5,<2)
+# Hand-pinning hf-hub/tokenizers here caused uv resolver conflicts, so don't.
+#
+# NOTE: transformers MUST be 5.12.1 — 4.57.x has a Gemma fast-tokenizer regression
+# (`extra_special_tokens` list handling) that crashes the load; 5.12.1 handles it.
+vllm==0.23.0
+transformers==5.12.1
+compressed-tensors==0.17.0
+accelerate
+tqdm
+# only needed by the depth submissions that set MODELZIP_SENTENCE_SPLIT=1 (sentence-aware
+# paragraph splitting). Pure-python, no models. Harmless for the int4/fp8 dirs.
+pysbd
+# only needed by the MBR quality-contrastive (MODELZIP_MBR=N): the chrF utility for candidate
+# selection. Pure-python metric, no models. Unused by the greedy PRIMARY / int4 / fp8 dirs.
+sacrebleu
