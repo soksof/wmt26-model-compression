@@ -1,6 +1,0 @@
-sacrebleu==2.5.1
-pymarian==1.12.31
-nvitop
-
-[dev]
-black>=25.0
