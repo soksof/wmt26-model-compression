@@ -142,3 +142,59 @@ If `GPU_IDS` is omitted, the wrapper uses `0..PARALLEL_JOBS-1`. Setup still runs
 `baseline` is the uncompressed Gemma 3 12B baseline using PyTorch and Transformers.
 
 `bnb-q8` and `bnb-q4` are simple BitsAndBytes memory/compression baselines. They are useful reference points, but they are not necessarily the fastest H100 inference route. Engine-native variants such as vLLM AWQ/GPTQ/FP8 or TensorRT-LLM INT4/FP8 should be represented as separate submission directories.
+
+***
+
+# WMT26 Model Compression - submission notes (arc/ilsp, Institute for Language and Speech Processing / Athena Research Center)
+
+This fork contains our submission packages for the WMT26 Model Compression shared
+task (constrained track, Gemma-3-12B). Base model: `google/gemma-3-12b-it`.
+
+## Packages (`submissions/`)
+
+| id | role | description |
+|---|---|---|
+| `vocaball-int4` | **PRIMARY** for `ces-deu`, `eng-ara_EG` | Vision tower removed; vocabulary pruned 262k → ~196k (script-based, covering task languages); GPTQ W4A16. ~6.65 GiB. |
+| `int4` | **PRIMARY** for `eng-zho_Hans` | As above but full 262k vocabulary (vocab pruning has a small significant cost on eng-zho_Hans, so that pair keeps the full-vocab model). ~7.04 GiB. |
+| `fp8` | contrastive, all pairs | FP8 dynamic quantization (llmcompressor); quality–speed point. ~13.8 GiB. |
+| `en-ar-mbr` | contrastive, **eng-ara_EG only** | Same checkpoint as `vocaball-int4` plus self-MBR decoding (N=16, chrF consensus), enabled via `submission.env`. Quality-max / speed-min by design (~16× decode cost). On any other language pair it logs a notice to stderr and falls back to greedy decoding. |
+
+Model weights are hosted on the Hugging Face Hub (public, no token required) and are
+downloaded by each package's `setup.sh`:
+`soksof/gemma-3-12b-wmt26-{vocaball-int4,int4,fp8}`.
+
+## Running from a fresh clone
+
+1. Materialize the test sets first:
+
+       python -m modelzip.setup
+
+   This creates workdir/tests/<lang-pair>/. Note: modelzip.evaluate treats an empty test list as a successful (empty) run. If you see "Using all available tests for <pair>: []", run the setup step above.
+
+2. Set up a package (builds its venv, installs modelzip from the repo root, downloads the model into workdir/model):
+
+       bash submissions/<id>/setup.sh
+
+3. Evaluate as usual, e.g.:
+
+       python -m modelzip.evaluate -m submissions/<id> -l ces-deu -M chrf -b 8 -B runs/out
+
+## Notes for the evaluation team
+
+- Batch size: validated at batch sizes 1 and 8 (8 is our declared maximum).
+- en-ar-mbr runtime: its ~16x decode cost is intentional (quality-max contrastive).
+  Please do not attribute its throughput to the primary systems - it shares weights
+  with vocaball-int4 but is a separate decode configuration.
+- Troubleshooting: if vLLM fails during CUDA-graph capture on your hardware, set
+  MODELZIP_ENFORCE_EAGER=1. We required this on RTX PRO 6000 (Blackwell) that we use for our experiments. Correctness is unaffected, throughput slightly reduced.
+- fp8 size: ~14 GB of shards; if the HF pull is slow from your infrastructure, contact us for a mirror.
+
+## Provenance
+
+All four packages were validated end-to-end from a fresh, token-less clone of this
+repository on 2026-07-14/15: anonymous model download, cold venv build, and
+modelzip.evaluate reproducing our recorded chrF scores (ces-deu 63.3-63.4,
+eng-zho_Hans 28.1, eng-ara_EG 38.7 with MBR) at batch sizes 1 and 8. (fp8 weights
+were staged from a local copy byte-identical to the HF repo after CDN throughput
+issues on our side; the other three downloaded anonymously in-place.)
+
